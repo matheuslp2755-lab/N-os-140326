@@ -1,0 +1,30 @@
+{
+  "posts": [
+    {
+      "id": "1",
+      "username": "NéosAdmin",
+      "userAvatar": "https://picsum.photos/seed/admin/200",
+      "imageUrl": "https://picsum.photos/seed/futuro/800/800",
+      "caption": "Bem-vindo ao novo banco de dados próprio da Néos! Suas fotos estão seguras aqui.",
+      "likes": 0,
+      "timestamp": "2026-03-16T00:00:00.000Z"
+    },
+    {
+      "id": "2",
+      "username": "Explorador",
+      "userAvatar": "https://picsum.photos/seed/user2/200",
+      "imageUrl": "https://picsum.photos/seed/cyber/800/800",
+      "caption": "A experiência Pro agora com servidor dedicado.",
+      "likes": 5,
+      "timestamp": "2026-03-15T22:00:00.000Z"
+    }
+  ],
+  "users": [
+    {
+      "id": "default",
+      "username": "Usuário Néos",
+      "bio": "Explorando o futuro das redes sociais.",
+      "avatar": "https://picsum.photos/seed/neos/200"
+    }
+  ]
+}

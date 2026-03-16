@@ -133,22 +133,33 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClose, onPo
                 return await getDownloadURL(ref);
             }));
 
-            await addDoc(collection(db, 'posts'), {
+            const postData = {
                 userId: auth.currentUser?.uid,
-                username: auth.currentUser?.displayName,
-                userAvatar: auth.currentUser?.photoURL,
+                username: auth.currentUser?.displayName || "Usuário Néos",
+                userAvatar: auth.currentUser?.photoURL || "https://picsum.photos/seed/user/200",
                 imageUrl: urls[0],
                 media: urls.map(url => ({ url, type: 'image' })),
                 caption,
                 likes: [],
-                timestamp: serverTimestamp(),
-                // Removido expiresAt para que as publicações sejam permanentes
                 musicInfo: selectedMusic,
                 showMusicCover,
                 mentionedUsers: mentionedUsers.map(u => ({ id: u.id, username: u.username })),
                 overlayText: overlayText.trim(),
                 filterId: activePreset.id,
                 isPublished: true
+            };
+
+            // Salva no Banco de Dados Próprio (API Local)
+            await fetch('/api/posts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(postData)
+            }).catch(err => console.error("Erro ao salvar na API local:", err));
+
+            // Mantém o salvamento no Firebase como redundância
+            await addDoc(collection(db, 'posts'), {
+                ...postData,
+                timestamp: serverTimestamp(),
             });
 
             onPostCreated();

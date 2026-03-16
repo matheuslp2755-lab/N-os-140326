@@ -153,17 +153,41 @@ const Feed: React.FC<{ user: any }> = ({ user }) => {
   useEffect(() => {
     if (viewMode === 'feed' && !viewingProfileId) {
       setLoading(true);
-      const q = query(
-          collection(db, 'posts'), 
-          orderBy('timestamp', 'desc'),
-          limit(50)
-      );
       
-      const unsubscribe = onSnapshot(q, (snap) => {
-        setPosts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        setLoading(false);
-      });
-      return () => unsubscribe();
+      // Tenta buscar do Banco de Dados Próprio (API Local)
+      fetch('/api/posts')
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.length > 0) {
+            setPosts(data);
+            setLoading(false);
+          } else {
+            // Fallback para Firebase se a API estiver vazia
+            const q = query(
+                collection(db, 'posts'), 
+                orderBy('timestamp', 'desc'),
+                limit(50)
+            );
+            const unsubscribe = onSnapshot(q, (snap) => {
+              setPosts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+              setLoading(false);
+            });
+            return () => unsubscribe();
+          }
+        })
+        .catch(() => {
+          // Fallback em caso de erro na API
+          const q = query(
+              collection(db, 'posts'), 
+              orderBy('timestamp', 'desc'),
+              limit(50)
+          );
+          const unsubscribe = onSnapshot(q, (snap) => {
+            setPosts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            setLoading(false);
+          });
+          return () => unsubscribe();
+        });
     }
   }, [viewMode, viewingProfileId, refreshKey]);
 

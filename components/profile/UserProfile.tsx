@@ -69,17 +69,43 @@ const UserProfile: React.FC<UserProfileProps> = ({ userId, onStartMessage, onSel
 
     useEffect(() => {
         if (!userId) return;
-        const userRef = doc(db, 'users', userId);
-        const unsub = onSnapshot(userRef, (doc) => {
-            if (doc.exists()) {
-                const userData = doc.data();
-                setUser(userData);
-                const lastSeen = userData.lastSeen;
-                const isUserOnline = lastSeen && (Date.now() / 1000 - lastSeen.seconds) < 120;
-                setIsOnline(!!isUserOnline);
-            }
-        });
-        return () => unsub();
+        
+        // Tenta buscar do Banco de Dados Próprio (API Local)
+        fetch(`/api/users/${userId}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data && data.username) {
+                    setUser(data);
+                    setIsOnline(true);
+                } else {
+                    // Fallback para Firebase
+                    const userRef = doc(db, 'users', userId);
+                    const unsub = onSnapshot(userRef, (doc) => {
+                        if (doc.exists()) {
+                            const userData = doc.data();
+                            setUser(userData);
+                            const lastSeen = userData.lastSeen;
+                            const isUserOnline = lastSeen && (Date.now() / 1000 - lastSeen.seconds) < 120;
+                            setIsOnline(!!isUserOnline);
+                        }
+                    });
+                    return () => unsub();
+                }
+            })
+            .catch(() => {
+                // Fallback para Firebase em caso de erro
+                const userRef = doc(db, 'users', userId);
+                const unsub = onSnapshot(userRef, (doc) => {
+                    if (doc.exists()) {
+                        const userData = doc.data();
+                        setUser(userData);
+                        const lastSeen = userData.lastSeen;
+                        const isUserOnline = lastSeen && (Date.now() / 1000 - lastSeen.seconds) < 120;
+                        setIsOnline(!!isUserOnline);
+                    }
+                });
+                return () => unsub();
+            });
     }, [userId]);
 
     useEffect(() => {
