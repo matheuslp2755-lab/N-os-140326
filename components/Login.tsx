@@ -49,15 +49,9 @@ const Login: React.FC<LoginProps> = ({ onSwitchMode }) => {
     setError('');
     try {
       // Tenta login no Banco de Dados Próprio (API Local)
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: sanitize(email), password })
-      });
+      const result = await api.auth.login({ email: sanitize(email), password });
       
-      const result = await response.json();
-      
-      if (response.ok) {
+      if (result.success) {
         const userData = result.user;
         // Salva na Memória do Celular (LocalStorage)
         localStorage.setItem('neos_current_user_id', userData.uid);
@@ -67,7 +61,7 @@ const Login: React.FC<LoginProps> = ({ onSwitchMode }) => {
         return;
       }
 
-      setError("E-mail ou senha incorretos.");
+      setError(result.error || "E-mail ou senha incorretos.");
 
     } catch (err: any) {
       console.error("Login Error:", err);

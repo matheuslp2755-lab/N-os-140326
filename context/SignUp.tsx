@@ -137,15 +137,9 @@ const SignUp: React.FC<{ onSwitchMode: () => void }> = ({ onSwitchMode }) => {
 
     try {
       // Tenta criar conta no Banco de Dados Próprio (API Local)
-      const response = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, username, password, age: ageNum })
-      });
+      const result = await api.auth.signup({ email, username, password, age: ageNum });
       
-      const result = await response.json();
-      
-      if (!response.ok) {
+      if (result.error) {
         setError(result.error || "Erro ao criar conta no servidor local.");
         setLoading(false);
         return;
