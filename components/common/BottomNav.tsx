@@ -1,7 +1,6 @@
 
 import React from 'react';
 import { useLanguage } from '../../context/LanguageContext';
-import { auth } from '../../firebase';
 
 interface BottomNavProps {
     currentView: 'feed' | 'vibes' | 'profile' | 'news';
@@ -35,7 +34,9 @@ const NewspaperIcon: React.FC<{ filled: boolean, className?: string }> = ({ fill
 
 const BottomNav: React.FC<BottomNavProps> = ({ currentView, onChangeView, onCreateClick }) => {
     const { t } = useLanguage();
-    const currentUser = auth.currentUser;
+    const currentUserId = localStorage.getItem('neos_current_user_id');
+    const userDataStr = currentUserId ? localStorage.getItem(`neos_user_${currentUserId}`) : null;
+    const userData = userDataStr ? JSON.parse(userDataStr) : null;
 
     return (
         <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-black border-t border-zinc-200 dark:border-zinc-800 z-40 pb-safe">
@@ -80,7 +81,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ currentView, onChangeView, onCrea
                     aria-label={t('header.profile')}
                 >
                     <img 
-                        src={currentUser?.photoURL || `https://i.pravatar.cc/150?u=${currentUser?.uid}`} 
+                        src={userData?.avatar || `https://i.pravatar.cc/150?u=${currentUserId}`} 
                         alt="Profile" 
                         className="w-6 h-6 rounded-full object-cover" 
                     />

@@ -22,7 +22,7 @@ import GaleriaFuturoModal from './feed/GaleriaFuturoModal';
 import ForwardModal from './messages/ForwardModal';
 import RadarNeosModal from './profile/RadarNeosModal';
 import NewsFeed from './news/NewsFeed';
-import { auth, db, collection, query, where, onSnapshot, orderBy, doc, getDoc, limit, deleteDoc, Timestamp } from '../firebase';
+import { api } from '../src/api';
 import { useLanguage } from '../context/LanguageContext';
 
 const Feed: React.FC<{ user: any }> = ({ user }) => {
@@ -112,15 +112,9 @@ const Feed: React.FC<{ user: any }> = ({ user }) => {
   }, [viewMode, viewingProfileId]);
 
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'system', 'global_alert'), (snap) => {
-        const data = snap.data();
-        if (data && data.message && !dismissedAlerts.includes(data.id)) {
-            setGlobalAlert({ message: data.message, id: data.id });
-            setAlertProgress(100);
-        }
-    });
-    return () => unsub();
-  }, [dismissedAlerts]);
+    // Mock global alert
+    setGlobalAlert({ message: "Bem-vindo ao Néos Social com Banco de Dados Próprio!", id: "welcome" });
+  }, []);
 
   useEffect(() => {
     if (globalAlert) {
@@ -143,9 +137,8 @@ const Feed: React.FC<{ user: any }> = ({ user }) => {
 
   useEffect(() => {
     if (!currentUser) return;
-    const q = query(collection(db, 'users', currentUser.uid, 'notifications'), where('read', '==', false), limit(1));
-    const unsub = onSnapshot(q, (snap) => setHasUnreadNotifications(!snap.empty));
-    return () => unsub();
+    // Mock unread notifications
+    setHasUnreadNotifications(false);
   }, [currentUser]);
 
   const [refreshKey, setRefreshKey] = useState(0);
@@ -154,39 +147,13 @@ const Feed: React.FC<{ user: any }> = ({ user }) => {
     if (viewMode === 'feed' && !viewingProfileId) {
       setLoading(true);
       
-      // Tenta buscar do Banco de Dados Próprio (API Local)
-      fetch('/api/posts')
-        .then(res => res.json())
+      api.posts.list()
         .then(data => {
-          if (data && data.length > 0) {
-            setPosts(data);
-            setLoading(false);
-          } else {
-            // Fallback para Firebase se a API estiver vazia
-            const q = query(
-                collection(db, 'posts'), 
-                orderBy('timestamp', 'desc'),
-                limit(50)
-            );
-            const unsubscribe = onSnapshot(q, (snap) => {
-              setPosts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-              setLoading(false);
-            });
-            return () => unsubscribe();
-          }
+          setPosts(data || []);
+          setLoading(false);
         })
         .catch(() => {
-          // Fallback em caso de erro na API
-          const q = query(
-              collection(db, 'posts'), 
-              orderBy('timestamp', 'desc'),
-              limit(50)
-          );
-          const unsubscribe = onSnapshot(q, (snap) => {
-            setPosts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-            setLoading(false);
-          });
-          return () => unsubscribe();
+          setLoading(false);
         });
     }
   }, [viewMode, viewingProfileId, refreshKey]);
@@ -197,29 +164,8 @@ const Feed: React.FC<{ user: any }> = ({ user }) => {
 
   useEffect(() => {
     if (!currentUser) return;
-    const fetchPulses = async () => {
-      const now = Timestamp.now();
-      const q = query(
-          collection(db, 'pulses'), 
-          where('expiresAt', '>', now),
-          orderBy('expiresAt', 'desc'), 
-          limit(100)
-      );
-      
-      return onSnapshot(q, async (snap) => {
-          const grouped = new Map();
-          for (const d of snap.docs) {
-              const p = d.data();
-              if (!grouped.has(p.authorId)) {
-                  const u = await getDoc(doc(db, 'users', p.authorId));
-                  if (u.exists()) grouped.set(p.authorId, { author: { id: p.authorId, ...u.data() }, pulses: [] });
-              }
-              if (grouped.has(p.authorId)) grouped.get(p.authorId).pulses.push({id: d.id, ...p});
-          }
-          setUsersWithPulses(Array.from(grouped.values()));
-      });
-    };
-    fetchPulses();
+    // Mock pulses for now
+    setUsersWithPulses([]);
   }, [currentUser]);
 
   const handleSelectUser = (id: string) => {
@@ -345,7 +291,10 @@ const Feed: React.FC<{ user: any }> = ({ user }) => {
                     <Post 
                       key={p.id} 
                       post={p} 
-                      onPostDeleted={(id) => deleteDoc(doc(db, 'posts', id))} 
+                      onPostDeleted={async (id) => {
+                        await api.posts.delete(id);
+                        setPosts(prev => prev.filter(p => p.id !== id));
+                      }} 
                       onForward={handleForwardPost} 
                       onSelectUser={handleSelectUser}
                     />
@@ -367,7 +316,7 @@ const Feed: React.FC<{ user: any }> = ({ user }) => {
             initialPulseIndex={0} 
             onClose={() => setViewingPulseGroup(null)} 
             onDelete={async (p) => {
-                await deleteDoc(doc(db, 'pulses', p.id));
+                // Mock pulse deletion
                 setViewingPulseGroup(null);
             }} 
             onViewProfile={handleSelectUser}

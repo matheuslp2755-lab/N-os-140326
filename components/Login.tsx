@@ -1,10 +1,9 @@
 
 import React, { useState } from 'react';
-import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
-import { auth } from '../firebase';
 import TextInput from './common/TextInput';
 import Button from './common/Button';
 import { useLanguage } from '../context/LanguageContext';
+import { api } from '../src/api';
 
 const sanitize = (str: string) => str.replace(/[<>]/g, "").trim();
 
@@ -64,38 +63,15 @@ const Login: React.FC<LoginProps> = ({ onSwitchMode }) => {
         localStorage.setItem('neos_current_user_id', userData.uid);
         localStorage.setItem(`neos_user_${userData.uid}`, JSON.stringify(userData));
         
-        // Tenta login no Firebase em segundo plano para manter compatibilidade
-        try {
-          await signInWithEmailAndPassword(auth, sanitize(email), password);
-        } catch (fbErr) {
-          console.warn("Firebase falhou, mas login local funcionou.");
-        }
-        
         window.location.reload();
         return;
       }
 
-      // Se falhou na API local, tenta direto no Firebase (caso a conta só exista lá)
-      const userCredential = await signInWithEmailAndPassword(auth, sanitize(email), password);
-      const user = userCredential.user;
-      
-      localStorage.setItem('neos_current_user_id', user.uid);
-      
-      fetch(`/api/users/${user.uid}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data) localStorage.setItem(`neos_user_${user.uid}`, JSON.stringify(data));
-        })
-        .catch(() => {});
+      setError("E-mail ou senha incorretos.");
 
     } catch (err: any) {
-      if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
-        setError(t('login.error'));
-      } else if (err.code === 'auth/too-many-requests') {
-        setError("Muitas tentativas. Tente novamente mais tarde.");
-      } else {
-        setError(t('login.error'));
-      }
+      console.error("Login Error:", err);
+      setError("Falha ao conectar com o servidor próprio.");
     } finally {
       setLoading(false);
     }
@@ -103,17 +79,7 @@ const Login: React.FC<LoginProps> = ({ onSwitchMode }) => {
 
   const handleResetSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setResetLoading(true);
-    setResetError('');
-    setResetSuccess('');
-    try {
-        await sendPasswordResetEmail(auth, sanitize(resetEmail));
-        setResetSuccess("Link enviado! Verifique seu e-mail.");
-    } catch (err: any) {
-        setResetError("E-mail não encontrado ou erro no servidor.");
-    } finally {
-        setResetLoading(false);
-    }
+    setResetError("Redefinição de senha não disponível no banco de dados local.");
   };
 
   return (

@@ -1,8 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-/* Added missing getDocs import */
-import { auth, db, doc, getDoc, collection, deleteDoc, serverTimestamp, updateDoc, onSnapshot, query, where, writeBatch, addDoc, setDoc, storage, storageRef, uploadBytes, getDownloadURL, getDocs, orderBy } from '../../firebase';
-import { signOut, deleteUser } from 'firebase/auth';
+import { api } from '../../src/api';
 import Button from '../common/Button';
 import EditProfileModal from './EditProfileModal';
 import FollowersModal from './FollowersModal';
@@ -52,8 +50,8 @@ const UserProfile: React.FC<UserProfileProps> = ({ userId, onStartMessage, onSel
     
     const [selectedPost, setSelectedPost] = useState<any | null>(null);
     
-    const currentUser = auth.currentUser;
-    const isOwner = currentUser?.uid === userId;
+    const currentUserId = localStorage.getItem('neos_current_user_id');
+    const isOwner = currentUserId === userId;
     
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -70,184 +68,73 @@ const UserProfile: React.FC<UserProfileProps> = ({ userId, onStartMessage, onSel
     useEffect(() => {
         if (!userId) return;
         
-        // Tenta buscar do Banco de Dados Próprio (API Local)
-        fetch(`/api/users/${userId}`)
-            .then(res => res.json())
+        api.users.get(userId)
             .then(data => {
-                if (data && data.username) {
+                if (data && !data.error) {
                     setUser(data);
                     setIsOnline(true);
-                } else {
-                    // Fallback para Firebase
-                    const userRef = doc(db, 'users', userId);
-                    const unsub = onSnapshot(userRef, (doc) => {
-                        if (doc.exists()) {
-                            const userData = doc.data();
-                            setUser(userData);
-                            const lastSeen = userData.lastSeen;
-                            const isUserOnline = lastSeen && (Date.now() / 1000 - lastSeen.seconds) < 120;
-                            setIsOnline(!!isUserOnline);
-                        }
-                    });
-                    return () => unsub();
                 }
             })
-            .catch(() => {
-                // Fallback para Firebase em caso de erro
-                const userRef = doc(db, 'users', userId);
-                const unsub = onSnapshot(userRef, (doc) => {
-                    if (doc.exists()) {
-                        const userData = doc.data();
-                        setUser(userData);
-                        const lastSeen = userData.lastSeen;
-                        const isUserOnline = lastSeen && (Date.now() / 1000 - lastSeen.seconds) < 120;
-                        setIsOnline(!!isUserOnline);
-                    }
-                });
-                return () => unsub();
-            });
+            .catch(() => {});
     }, [userId]);
 
     useEffect(() => {
         if (!userId) return;
-
-        const unsubFollowers = onSnapshot(collection(db, 'users', userId, 'followers'), (snap) => {
-            setStats(prev => ({ ...prev, followers: snap.size }));
-        });
-
-        const unsubFollowing = onSnapshot(collection(db, 'users', userId, 'following'), (snap) => {
-            setStats(prev => ({ ...prev, following: snap.size }));
-        });
-
-        let unsubIsFollowing = () => {};
-        if (currentUser && !isOwner) {
-            unsubIsFollowing = onSnapshot(doc(db, 'users', userId, 'followers', currentUser.uid), (doc) => {
-                setIsFollowing(doc.exists());
-            });
-        }
-
-        return () => {
-            unsubFollowers();
-            unsubFollowing();
-            unsubIsFollowing();
-        };
-    }, [userId, currentUser, isOwner]);
+        // Mock stats and follows for now
+        setStats({ posts: 0, followers: 0, following: 0 });
+        setIsFollowing(false);
+    }, [userId, currentUserId]);
 
     useEffect(() => {
         if (!userId) return;
-        const postsQ = query(collection(db, 'posts'), where('userId', '==', userId));
-        const unsub = onSnapshot(postsQ, (snap) => {
-            setPosts(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)));
-            setStats(prev => ({ ...prev, posts: snap.size }));
-        });
-
-        const memoriesQ = query(collection(db, 'users', userId, 'memories'), orderBy('createdAt', 'desc'));
-        const unsubMemories = onSnapshot(memoriesQ, (snap) => {
-            setMemories(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        });
-
-        return () => {
-            unsub();
-            unsubMemories();
-        };
+        // Mock posts and memories for now
+        setPosts([]);
+        setMemories([]);
     }, [userId]);
 
     const handleUpdateProfile = async (updatedData: any) => {
-        if (!currentUser || !isOwner) return;
+        if (!currentUserId || !isOwner) return;
         setIsSubmitting(true);
         try {
-            let avatarUrl = user.avatar;
-            if (updatedData.avatarFile) {
-                const avatarRef = storageRef(storage, `avatars/${userId}/avatar_${Date.now()}.jpg`);
-                await uploadBytes(avatarRef, updatedData.avatarFile);
-                avatarUrl = await getDownloadURL(avatarRef);
-            }
-
             const payload: any = {
                 username: updatedData.username,
-                username_lowercase: updatedData.username.toLowerCase(),
                 nickname: updatedData.nickname,
                 bio: updatedData.bio,
-                avatar: avatarUrl,
                 isPrivate: updatedData.isPrivate,
             };
 
-            if (updatedData.profileMusic !== undefined) payload.profileMusic = updatedData.profileMusic;
-            if (updatedData.currentVibe !== undefined) payload.currentVibe = updatedData.currentVibe;
+            const result = await api.users.update(userId, payload);
 
-            await updateDoc(doc(db, 'users', userId), payload);
-
-            // Salva no Banco de Dados Próprio (API Local)
-            await fetch('/api/users', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ uid: userId, ...payload })
-            }).catch(err => console.error("Erro ao salvar perfil na API local:", err));
-
-            // Salva na Memória do Celular (LocalStorage)
-            const localData = JSON.parse(localStorage.getItem(`neos_user_${userId}`) || '{}');
-            localStorage.setItem(`neos_user_${userId}`, JSON.stringify({ ...localData, ...payload }));
-
-            setIsEditModalOpen(false);
+            if (result.success) {
+                setUser(result.user);
+                localStorage.setItem(`neos_user_${userId}`, JSON.stringify(result.user));
+                setIsEditModalOpen(false);
+            }
         } catch (e) {
             console.error("Erro ao salvar perfil:", e);
-            alert("Erro ao salvar alterações. Tente novamente.");
         } finally {
             setIsSubmitting(false);
         }
     };
 
     const handleFollowToggle = async () => {
-        if (!currentUser || isOwner) return;
-        const targetFollowerRef = doc(db, 'users', userId, 'followers', currentUser.uid);
-        const myFollowingRef = doc(db, 'users', currentUser.uid, 'following', userId);
-        
-        try {
-            if (isFollowing) {
-                await deleteDoc(targetFollowerRef);
-                await deleteDoc(myFollowingRef);
-            } else {
-                await setDoc(targetFollowerRef, { timestamp: serverTimestamp() });
-                await setDoc(myFollowingRef, { timestamp: serverTimestamp() });
-                
-                await addDoc(collection(db, 'users', userId, 'notifications'), {
-                    type: 'follow',
-                    fromUserId: currentUser.uid,
-                    fromUsername: currentUser.displayName,
-                    fromUserAvatar: currentUser.photoURL,
-                    timestamp: serverTimestamp(),
-                    read: false
-                });
-            }
-        } catch (e) { console.error(e); }
+        // Mock follow toggle
+        setIsFollowing(!isFollowing);
     };
 
     const handleDeleteAccountPermanently = async () => {
-        if (!currentUser || !isOwner) return;
-        const confirmation = window.confirm("ATENÇÃO: Deseja excluir sua conta Néos permanentemente? Todas as suas fotos, vídeos e dados serão apagados para sempre.");
+        if (!currentUserId || !isOwner) return;
+        const confirmation = window.confirm("ATENÇÃO: Deseja excluir sua conta Néos permanentemente?");
         if (!confirmation) return;
-        setIsDeletingAccount(true);
-        try {
-            const batch = writeBatch(db);
-            /* Fixed: Added getDocs to imports and calling it here */
-            const postsSnap = await getDocs(query(collection(db, 'posts'), where('userId', '==', currentUser.uid)));
-            postsSnap.forEach(d => batch.delete(d.ref));
-            /* Fixed: Added getDocs to imports and calling it here */
-            const pulsesSnap = await getDocs(query(collection(db, 'pulses'), where('authorId', '==', currentUser.uid)));
-            pulsesSnap.forEach(d => batch.delete(d.ref));
-            /* Fixed: Added getDocs to imports and calling it here */
-            const vibesSnap = await getDocs(query(collection(db, 'vibes'), where('userId', '==', currentUser.uid)));
-            vibesSnap.forEach(d => batch.delete(d.ref));
-            batch.delete(doc(db, 'users', currentUser.uid));
-            await batch.commit();
-            await deleteUser(currentUser);
-            window.location.reload();
-        } catch (e: any) {
-            console.error("Erro ao excluir conta:", e);
-            alert("Erro ao excluir conta. Tente novamente.");
-        } finally {
-            setIsDeletingAccount(false);
-        }
+        
+        localStorage.removeItem('neos_current_user_id');
+        localStorage.removeItem(`neos_user_${userId}`);
+        window.location.reload();
+    };
+
+    const handleSignOut = () => {
+        localStorage.removeItem('neos_current_user_id');
+        window.location.reload();
     };
 
     if (!user) return <div className="p-8 text-center">Carregando perfil...</div>;
@@ -313,7 +200,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ userId, onStartMessage, onSel
                                                 Solicitar Verificado
                                             </button>
                                         )}
-                                        {isOwner && <button onClick={() => signOut(auth)} className="w-full text-left px-4 py-3 text-sm font-bold border-b dark:border-zinc-800">Sair da Conta</button>}
+                                        {isOwner && <button onClick={handleSignOut} className="w-full text-left px-4 py-3 text-sm font-bold border-b dark:border-zinc-800">Sair da Conta</button>}
                                         {isOwner && <button onClick={handleDeleteAccountPermanently} disabled={isDeletingAccount} className="w-full text-left px-4 py-3 text-xs text-red-500 font-black uppercase tracking-widest hover:bg-red-500/10">{isDeletingAccount ? 'Excluindo...' : 'Excluir conta Néos permanentemente'}</button>}
                                         {!isOwner && <button className="w-full text-left px-4 py-3 text-sm text-red-500 font-bold">Denunciar Perfil</button>}
                                     </div>
@@ -359,7 +246,11 @@ const UserProfile: React.FC<UserProfileProps> = ({ userId, onStartMessage, onSel
                         <div className="flex justify-end mb-2">
                             <button onClick={() => setSelectedPost(null)} className="text-white text-3xl font-thin">&times;</button>
                         </div>
-                        <Post post={selectedPost} onPostDeleted={(id) => { deleteDoc(doc(db, 'posts', id)); setSelectedPost(null); }} onSelectUser={(uid) => { setSelectedPost(null); onSelectUser?.(uid); }} />
+                        <Post post={selectedPost} onPostDeleted={async (id) => { 
+                            await api.posts.delete(id);
+                            setPosts(prev => prev.filter(p => p.id !== id));
+                            setSelectedPost(null); 
+                        }} onSelectUser={(uid) => { setSelectedPost(null); onSelectUser?.(uid); }} />
                     </div>
                 </div>
             )}

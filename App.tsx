@@ -1,19 +1,11 @@
 import React, { useState, useEffect, StrictMode } from 'react';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth, db, doc, updateDoc, serverTimestamp } from './firebase';
 import Login from './components/Login';
 import SignUp from './context/SignUp';
 import Feed from './components/Feed';
 import { LanguageProvider } from './context/LanguageContext';
 import { CallProvider } from './context/CallContext';
 import CallUI from './components/call/CallUI';
-
-declare global {
-  interface Window {
-    OneSignalDeferred: any[];
-    OneSignal: any;
-  }
-}
+import { api } from './src/api';
 
 const AppContent: React.FC = () => {
   const [user, setUser] = useState<any | null>(null);
@@ -21,77 +13,31 @@ const AppContent: React.FC = () => {
   const [authPage, setAuthPage] = useState<'login' | 'signup'>('login');
 
   useEffect(() => {
-    // Tenta carregar usuário da memória do celular (LocalStorage) para um carregamento instantâneo
     const cachedUserId = localStorage.getItem('neos_current_user_id');
     if (cachedUserId) {
       const cachedUserData = localStorage.getItem(`neos_user_${cachedUserId}`);
       if (cachedUserData) {
         try {
           const parsedUser = JSON.parse(cachedUserData);
-          // Define o usuário localmente se o Firebase ainda não carregou
           setUser(parsedUser);
-          setLoading(false);
-          console.log("Néos: Usuário carregado da memória local:", cachedUserId);
+          
+          // Verifica se o usuário ainda é válido no servidor
+          api.users.get(cachedUserId).then(data => {
+            if (data && !data.error) {
+              setUser(data);
+              localStorage.setItem(`neos_user_${cachedUserId}`, JSON.stringify(data));
+            } else {
+              // Se não existir mais no servidor, desloga
+              localStorage.removeItem('neos_current_user_id');
+              setUser(null);
+            }
+          }).catch(() => {});
         } catch (e) {
           console.error("Erro ao ler cache local:", e);
         }
       }
     }
-
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
-      } else if (!cachedUserId) {
-        // Só desloga se não houver usuário no cache local também
-        setUser(null);
-      }
-      setLoading(false);
-
-      if (currentUser) {
-        // Sync OneSignal login
-        window.OneSignalDeferred = window.OneSignalDeferred || [];
-        window.OneSignalDeferred.push(async function(OneSignal: any) {
-          await OneSignal.login(currentUser.uid);
-          console.log("Néos: OneSignal login synced:", currentUser.uid);
-        });
-
-        // Presence Logic
-        const userRef = doc(db, 'users', currentUser.uid);
-        const updatePresence = () => {
-          updateDoc(userRef, {
-            lastSeen: serverTimestamp(),
-            status: 'online'
-          }).catch(() => {});
-        };
-
-        updatePresence();
-        const interval = setInterval(updatePresence, 60000); // Update every minute
-
-        // Handle visibility change
-        const handleVisibilityChange = () => {
-          if (document.visibilityState === 'visible') {
-            updatePresence();
-          } else {
-            updateDoc(userRef, {
-              status: 'offline',
-              lastSeen: serverTimestamp()
-            }).catch(() => {});
-          }
-        };
-
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-
-        return () => {
-          clearInterval(interval);
-          document.removeEventListener('visibilitychange', handleVisibilityChange);
-          updateDoc(userRef, {
-            status: 'offline',
-            lastSeen: serverTimestamp()
-          }).catch(() => {});
-        };
-      }
-    });
-    return () => unsubscribe();
+    setLoading(false);
   }, []);
 
   if (loading) return (

@@ -1,10 +1,9 @@
 
 import React, { useState } from 'react';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { auth, db, setDoc, doc, storage, storageRef, uploadBytes, getDownloadURL, serverTimestamp, collection, query, where, getDocs, limit } from '../firebase';
 import TextInput from '../components/common/TextInput';
 import Button from '../components/common/Button';
 import { useLanguage } from './LanguageContext';
+import { api } from '../src/api';
 
 const PrivacyModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
@@ -111,14 +110,9 @@ const SignUp: React.FC<{ onSwitchMode: () => void }> = ({ onSwitchMode }) => {
   const isFormValid = email.includes('@') && username.trim() !== '' && password.trim().length >= 6 && age !== '' && accepted;
 
   const checkUsernameAvailable = async (name: string) => {
-    try {
-      const q = query(collection(db, 'users'), where('username_lowercase', '==', name.toLowerCase()), limit(1));
-      const snap = await getDocs(q);
-      return snap.empty;
-    } catch (e) {
-      console.error("Erro ao verificar username:", e);
-      return true;
-    }
+    // Para o banco de dados próprio, podemos implementar isso na API se necessário
+    // Por enquanto, vamos deixar a API de signup lidar com erros de duplicidade
+    return true;
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -163,16 +157,6 @@ const SignUp: React.FC<{ onSwitchMode: () => void }> = ({ onSwitchMode }) => {
       localStorage.setItem(`neos_user_${userData.uid}`, JSON.stringify(userData));
       localStorage.setItem('neos_current_user_id', userData.uid);
       
-      // Tenta criar no Firebase em segundo plano (se possível) para manter compatibilidade
-      try {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const fbUser = userCredential.user;
-        await updateProfile(fbUser, { displayName: username, photoURL: userData.avatar });
-        await setDoc(doc(db, 'users', fbUser.uid), { ...userData, uid: fbUser.uid });
-      } catch (fbErr) {
-        console.warn("Firebase falhou, mas conta local foi criada:", fbErr);
-      }
-
       console.log("Néos: Conta criada no banco de dados próprio!");
       window.location.reload(); // Recarrega para aplicar o login
       

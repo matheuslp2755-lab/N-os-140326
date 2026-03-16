@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { auth, db, storage, addDoc, collection, serverTimestamp, storageRef, getDownloadURL, uploadBytes } from '../../firebase';
+import { api } from '../../src/api';
 import { useLanguage } from '../../context/LanguageContext';
 import Button from '../common/Button';
 import TextAreaInput from '../common/TextAreaInput';
@@ -125,18 +125,22 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClose, onPo
         if (mediaList.length === 0 || submitting) return;
         setSubmitting(true);
         try {
+            const currentUserId = localStorage.getItem('neos_current_user_id');
+            const currentUserData = JSON.parse(localStorage.getItem(`neos_user_${currentUserId}`) || '{}');
+
             const urls = await Promise.all(mediaList.map(async (item) => {
                 const jpgBlob = await convertToJpg(item);
-                const path = `posts/${auth.currentUser?.uid}/${Date.now()}.jpg`;
-                const ref = storageRef(storage, path);
-                await uploadBytes(ref, jpgBlob);
-                return await getDownloadURL(ref);
+                return new Promise<string>((resolve) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result as string);
+                    reader.readAsDataURL(jpgBlob);
+                });
             }));
 
             const postData = {
-                userId: auth.currentUser?.uid,
-                username: auth.currentUser?.displayName || "Usuário Néos",
-                userAvatar: auth.currentUser?.photoURL || "https://picsum.photos/seed/user/200",
+                userId: currentUserId,
+                username: currentUserData.username || "Usuário Néos",
+                userAvatar: currentUserData.avatar || "https://picsum.photos/seed/user/200",
                 imageUrl: urls[0],
                 media: urls.map(url => ({ url, type: 'image' })),
                 caption,
@@ -149,21 +153,12 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClose, onPo
                 isPublished: true
             };
 
-            // Salva no Banco de Dados Próprio (API Local)
-            await fetch('/api/posts', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(postData)
-            }).catch(err => console.error("Erro ao salvar na API local:", err));
+            const result = await api.posts.create(postData);
 
-            // Mantém o salvamento no Firebase como redundância
-            await addDoc(collection(db, 'posts'), {
-                ...postData,
-                timestamp: serverTimestamp(),
-            });
-
-            onPostCreated();
-            onClose();
+            if (result.success) {
+                onPostCreated();
+                onClose();
+            }
         } catch (e) { 
             console.error("Erro ao publicar post:", e);
         } finally {

@@ -25,10 +25,47 @@ async function startServer() {
 
   app.post("/api/posts", (req, res) => {
     const db = JSON.parse(fs.readFileSync(DB_PATH, "utf-8"));
-    const newPost = { id: Date.now().toString(), ...req.body, timestamp: new Date().toISOString() };
+    const newPost = { 
+      id: Date.now().toString(), 
+      ...req.body, 
+      timestamp: new Date().toISOString(),
+      likes: [],
+      comments: []
+    };
     db.posts.unshift(newPost);
     fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
     res.json(newPost);
+  });
+
+  app.post("/api/posts/:id/like", (req, res) => {
+    const db = JSON.parse(fs.readFileSync(DB_PATH, "utf-8"));
+    const { userId } = req.body;
+    const post = db.posts.find((p: any) => p.id === req.params.id);
+    if (post) {
+      if (!post.likes) post.likes = [];
+      const index = post.likes.indexOf(userId);
+      if (index === -1) {
+        post.likes.push(userId);
+      } else {
+        post.likes.splice(index, 1);
+      }
+      fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
+      res.json(post);
+    } else {
+      res.status(404).json({ error: "Post não encontrado" });
+    }
+  });
+
+  app.delete("/api/posts/:id", (req, res) => {
+    const db = JSON.parse(fs.readFileSync(DB_PATH, "utf-8"));
+    const index = db.posts.findIndex((p: any) => p.id === req.params.id);
+    if (index !== -1) {
+      db.posts.splice(index, 1);
+      fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
+      res.json({ success: true });
+    } else {
+      res.status(404).json({ error: "Post não encontrado" });
+    }
   });
 
   app.post("/api/auth/signup", (req, res) => {
@@ -39,18 +76,21 @@ async function startServer() {
       return res.status(400).json({ error: "E-mail já cadastrado." });
     }
     
+    const uid = Date.now().toString();
     const newUser = {
-      uid: Date.now().toString(),
-      id: Date.now().toString(),
+      uid,
+      id: uid,
       email,
       username,
       username_lowercase: username.toLowerCase(),
-      password, // Em produção usaríamos hash, mas para protótipo local está ok
+      password,
       age,
       avatar: `https://picsum.photos/seed/${username}/200`,
       bio: "",
       createdAt: new Date().toISOString(),
-      isVerified: false
+      isVerified: false,
+      isPrivate: false,
+      appearOnRadar: true
     };
     
     db.users.push(newUser);
@@ -70,23 +110,45 @@ async function startServer() {
     res.json({ success: true, user });
   });
 
+  app.get("/api/users/search", (req, res) => {
+    const db = JSON.parse(fs.readFileSync(DB_PATH, "utf-8"));
+    const query = (req.query.q as string || "").toLowerCase();
+    const results = db.users
+      .filter((u: any) => 
+        u.username.toLowerCase().includes(query) || 
+        (u.nickname && u.nickname.toLowerCase().includes(query))
+      )
+      .map((u: any) => {
+        const { password, ...safeUser } = u;
+        return safeUser;
+      })
+      .slice(0, 15);
+    res.json(results);
+  });
+
   app.get("/api/users/:id", (req, res) => {
     const db = JSON.parse(fs.readFileSync(DB_PATH, "utf-8"));
     const user = db.users.find((u: any) => u.id === req.params.id || u.uid === req.params.id);
-    res.json(user || { id: req.params.id, username: "Usuário Néos", bio: "Bem-vindo à Néos!" });
+    if (user) {
+      const { password, ...safeUser } = user;
+      res.json(safeUser);
+    } else {
+      res.status(404).json({ error: "Usuário não encontrado" });
+    }
   });
 
-  app.post("/api/users", (req, res) => {
+  app.post("/api/users/:id", (req, res) => {
     const db = JSON.parse(fs.readFileSync(DB_PATH, "utf-8"));
     const userData = req.body;
-    const index = db.users.findIndex((u: any) => u.uid === userData.uid);
+    const index = db.users.findIndex((u: any) => u.uid === req.params.id || u.id === req.params.id);
     if (index !== -1) {
       db.users[index] = { ...db.users[index], ...userData };
+      fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
+      const { password, ...safeUser } = db.users[index];
+      res.json({ success: true, user: safeUser });
     } else {
-      db.users.push(userData);
+      res.status(404).json({ error: "Usuário não encontrado" });
     }
-    fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
-    res.json({ success: true, user: userData });
   });
 
   // Vite middleware for development

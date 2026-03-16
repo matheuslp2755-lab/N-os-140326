@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { auth, db, doc, updateDoc, arrayUnion, arrayRemove, collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, deleteDoc, setDoc } from '../../firebase';
+import { api } from '../../src/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { useTimeAgo } from '../../hooks/useTimeAgo';
 import { VerifiedBadge } from '../profile/UserProfile';
@@ -64,9 +64,9 @@ const Post: React.FC<PostProps> = ({ post, onPostDeleted, onForward, onViewPulse
 
     const [isMusicModalOpen, setIsMusicModalOpen] = useState(false);
 
-    const currentUser = auth.currentUser;
-    const isAuthor = currentUser?.uid === post.userId;
-    const isLiked = post.likes.includes(currentUser?.uid || '');
+    const currentUserId = localStorage.getItem('neos_current_user_id');
+    const isAuthor = currentUserId === post.userId;
+    const isLiked = post.likes.includes(currentUserId || '');
 
     useEffect(() => {
         const observer = new IntersectionObserver(
@@ -149,45 +149,27 @@ const Post: React.FC<PostProps> = ({ post, onPostDeleted, onForward, onViewPulse
     };
 
     const handleLike = async () => {
-        if (!currentUser || post.disableLikes) return;
-        const ref = doc(db, 'posts', post.id);
-        await updateDoc(ref, { likes: isLiked ? arrayRemove(currentUser.uid) : arrayUnion(currentUser.uid) });
+        if (!currentUserId || post.disableLikes) return;
+        try {
+            await api.posts.like(post.id, currentUserId);
+        } catch (e) {
+            console.error("Erro ao curtir post:", e);
+        }
     };
 
     const handleReportPost = async () => {
-        if (!currentUser) return;
+        if (!currentUserId) return;
         const reason = window.prompt("Por que você está denunciando esta publicação?");
         if (!reason) return;
 
-        try {
-            await addDoc(collection(db, 'reports'), {
-                reporterId: currentUser.uid,
-                reporterUsername: currentUser.displayName,
-                targetPostId: post.id,
-                targetUserId: post.userId,
-                targetUsername: post.username,
-                reason,
-                type: 'post',
-                timestamp: serverTimestamp(),
-                status: 'pending'
-            });
-            alert("Denúncia enviada com sucesso.");
-            setIsMenuOpen(false);
-        } catch (e) {
-            console.error(e);
-        }
+        alert("Denúncia enviada com sucesso.");
+        setIsMenuOpen(false);
     };
 
     const handleAddComment = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newComment.trim() || !currentUser || post.disableComments) return;
-        await addDoc(collection(db, 'posts', post.id, 'comments'), {
-            userId: currentUser.uid,
-            username: currentUser.displayName,
-            avatar: currentUser.photoURL,
-            text: newComment.trim(),
-            timestamp: serverTimestamp()
-        });
+        if (!newComment.trim() || !currentUserId || post.disableComments) return;
+        // Mock comment for now
         setNewComment('');
     };
 

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { auth, db, collection, query, where, getDocs, limit, doc, serverTimestamp, onSnapshot, writeBatch, getDoc, orderBy, setDoc, deleteDoc } from '../../firebase';
+import { api } from '../../src/api';
 import { useLanguage } from '../../context/LanguageContext';
 import { VerifiedBadge } from '../profile/UserProfile';
 
@@ -35,7 +35,7 @@ const Header: React.FC<HeaderProps> = ({ onSelectUser, onGoHome, onRefresh, onOp
     const [isSearchOverlayOpen, setIsSearchOverlayOpen] = useState(false);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
-    const currentUser = auth.currentUser;
+    const currentUserId = localStorage.getItem('neos_current_user_id');
 
     const handleLogoClick = () => {
         if (onRefresh) {
@@ -45,14 +45,11 @@ const Header: React.FC<HeaderProps> = ({ onSelectUser, onGoHome, onRefresh, onOp
     };
 
     useEffect(() => {
-        if (!currentUser) return;
-        const q = query(collection(db, 'users', currentUser.uid, 'notifications'), orderBy('timestamp', 'desc'), limit(30));
-        return onSnapshot(q, (snapshot) => {
-            const items = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Notification));
-            setNotifications(items);
-            setUnreadCount(items.filter(n => !n.read).length);
-        });
-    }, [currentUser]);
+        if (!currentUserId) return;
+        // Mock notifications for now
+        setNotifications([]);
+        setUnreadCount(0);
+    }, [currentUserId]);
 
     useEffect(() => {
         if (searchQuery.trim() === '') {
@@ -62,14 +59,7 @@ const Header: React.FC<HeaderProps> = ({ onSelectUser, onGoHome, onRefresh, onOp
         const delayDebounceFn = setTimeout(async () => {
             setIsSearching(true);
             try {
-                const q = query(
-                    collection(db, 'users'),
-                    where('username_lowercase', '>=', searchQuery.toLowerCase()),
-                    where('username_lowercase', '<=', searchQuery.toLowerCase() + '\uf8ff'),
-                    limit(15)
-                );
-                const querySnapshot = await getDocs(q);
-                const users = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const users = await api.users.search(searchQuery);
                 setSearchResults(users);
             } catch (err) {
                 console.error("Search error:", err);
@@ -81,57 +71,16 @@ const Header: React.FC<HeaderProps> = ({ onSelectUser, onGoHome, onRefresh, onOp
     }, [searchQuery]);
 
     const markAllAsRead = async () => {
-        if (!currentUser || unreadCount === 0) return;
-        const batch = writeBatch(db);
-        notifications.forEach(n => {
-            if (!n.read) {
-                batch.update(doc(db, 'users', currentUser.uid, 'notifications', n.id), { read: true });
-            }
-        });
-        await batch.commit();
+        if (!currentUserId || unreadCount === 0) return;
         setUnreadCount(0);
     };
 
     const handleAcceptRequest = async (notif: Notification) => {
-        if (!currentUser) return;
-        const batch = writeBatch(db);
-        
-        // 1. Adicionar aos seguidores
-        batch.set(doc(db, 'users', currentUser.uid, 'followers', notif.fromUserId), {
-            username: notif.fromUsername,
-            avatar: notif.fromUserAvatar,
-            timestamp: serverTimestamp()
-        });
-
-        // 2. Adicionar à lista de "seguindo" da outra pessoa
-        const targetUserDoc = await getDoc(doc(db, 'users', currentUser.uid));
-        const myData = targetUserDoc.data();
-        batch.set(doc(db, 'users', notif.fromUserId, 'following', currentUser.uid), {
-            username: myData?.username,
-            avatar: myData?.avatar,
-            timestamp: serverTimestamp()
-        });
-
-        // 3. Limpar documentos de solicitação
-        batch.delete(doc(db, 'users', currentUser.uid, 'followRequests', notif.fromUserId));
-        batch.delete(doc(db, 'users', notif.fromUserId, 'sentFollowRequests', currentUser.uid));
-
-        // 4. Marcar notificação como processada/lida
-        batch.update(doc(db, 'users', currentUser.uid, 'notifications', notif.id), { 
-            read: true,
-            type: 'follow' // Converte para seguidor normal na visualização
-        });
-
-        await batch.commit();
+        // Mock accept request
     };
 
     const handleDeclineRequest = async (notif: Notification) => {
-        if (!currentUser) return;
-        const batch = writeBatch(db);
-        batch.delete(doc(db, 'users', currentUser.uid, 'followRequests', notif.fromUserId));
-        batch.delete(doc(db, 'users', notif.fromUserId, 'sentFollowRequests', currentUser.uid));
-        batch.delete(doc(db, 'users', currentUser.uid, 'notifications', notif.id));
-        await batch.commit();
+        // Mock decline request
     };
 
     const toggleActivity = () => {
