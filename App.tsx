@@ -24,15 +24,27 @@ const AppContent: React.FC = () => {
     // Tenta carregar usuário da memória do celular (LocalStorage) para um carregamento instantâneo
     const cachedUserId = localStorage.getItem('neos_current_user_id');
     if (cachedUserId) {
-      const cachedUser = localStorage.getItem(`neos_user_${cachedUserId}`);
-      if (cachedUser) {
-        // Opcional: Você pode definir um estado de 'usuário prévio' aqui se quiser
-        console.log("Néos: Usuário carregado da memória local:", cachedUserId);
+      const cachedUserData = localStorage.getItem(`neos_user_${cachedUserId}`);
+      if (cachedUserData) {
+        try {
+          const parsedUser = JSON.parse(cachedUserData);
+          // Define o usuário localmente se o Firebase ainda não carregou
+          setUser(parsedUser);
+          setLoading(false);
+          console.log("Néos: Usuário carregado da memória local:", cachedUserId);
+        } catch (e) {
+          console.error("Erro ao ler cache local:", e);
+        }
       }
     }
 
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+      if (currentUser) {
+        setUser(currentUser);
+      } else if (!cachedUserId) {
+        // Só desloga se não houver usuário no cache local também
+        setUser(null);
+      }
       setLoading(false);
 
       if (currentUser) {

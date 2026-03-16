@@ -49,13 +49,38 @@ const Login: React.FC<LoginProps> = ({ onSwitchMode }) => {
     setLoading(true);
     setError('');
     try {
+      // Tenta login no Banco de Dados Próprio (API Local)
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: sanitize(email), password })
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok) {
+        const userData = result.user;
+        // Salva na Memória do Celular (LocalStorage)
+        localStorage.setItem('neos_current_user_id', userData.uid);
+        localStorage.setItem(`neos_user_${userData.uid}`, JSON.stringify(userData));
+        
+        // Tenta login no Firebase em segundo plano para manter compatibilidade
+        try {
+          await signInWithEmailAndPassword(auth, sanitize(email), password);
+        } catch (fbErr) {
+          console.warn("Firebase falhou, mas login local funcionou.");
+        }
+        
+        window.location.reload();
+        return;
+      }
+
+      // Se falhou na API local, tenta direto no Firebase (caso a conta só exista lá)
       const userCredential = await signInWithEmailAndPassword(auth, sanitize(email), password);
       const user = userCredential.user;
       
-      // Salva ID na Memória do Celular para persistência rápida
       localStorage.setItem('neos_current_user_id', user.uid);
       
-      // Tenta buscar dados do usuário para cache local
       fetch(`/api/users/${user.uid}`)
         .then(res => res.json())
         .then(data => {

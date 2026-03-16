@@ -31,6 +31,45 @@ async function startServer() {
     res.json(newPost);
   });
 
+  app.post("/api/auth/signup", (req, res) => {
+    const db = JSON.parse(fs.readFileSync(DB_PATH, "utf-8"));
+    const { email, username, password, age } = req.body;
+    
+    if (db.users.find((u: any) => u.email === email)) {
+      return res.status(400).json({ error: "E-mail já cadastrado." });
+    }
+    
+    const newUser = {
+      uid: Date.now().toString(),
+      id: Date.now().toString(),
+      email,
+      username,
+      username_lowercase: username.toLowerCase(),
+      password, // Em produção usaríamos hash, mas para protótipo local está ok
+      age,
+      avatar: `https://picsum.photos/seed/${username}/200`,
+      bio: "",
+      createdAt: new Date().toISOString(),
+      isVerified: false
+    };
+    
+    db.users.push(newUser);
+    fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
+    res.json({ success: true, user: newUser });
+  });
+
+  app.post("/api/auth/login", (req, res) => {
+    const db = JSON.parse(fs.readFileSync(DB_PATH, "utf-8"));
+    const { email, password } = req.body;
+    
+    const user = db.users.find((u: any) => u.email === email && u.password === password);
+    if (!user) {
+      return res.status(401).json({ error: "E-mail ou senha incorretos." });
+    }
+    
+    res.json({ success: true, user });
+  });
+
   app.get("/api/users/:id", (req, res) => {
     const db = JSON.parse(fs.readFileSync(DB_PATH, "utf-8"));
     const user = db.users.find((u: any) => u.id === req.params.id || u.uid === req.params.id);

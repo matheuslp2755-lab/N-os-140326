@@ -142,74 +142,43 @@ const SignUp: React.FC<{ onSwitchMode: () => void }> = ({ onSwitchMode }) => {
     setError('');
 
     try {
-      const available = await checkUsernameAvailable(username);
-      if (!available) {
-        setError("Este nome de usuário já está em uso.");
+      // Tenta criar conta no Banco de Dados Próprio (API Local)
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, username, password, age: ageNum })
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        setError(result.error || "Erro ao criar conta no servidor local.");
         setLoading(false);
         return;
       }
 
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-
-      const initial = username.charAt(0).toUpperCase();
-      const colors = ['#6366f1', '#a855f7', '#ec4899', '#ef4444', '#f59e0b', '#10b981', '#06b6d4', '#3b82f6'];
-      const color = colors[initial.charCodeAt(0) % colors.length];
-      const svgString = `<svg xmlns="http://www.w3.org/2000/svg" width="150" height="150" viewBox="0 0 150 150"><rect width="100%" height="100%" fill="${color}" /><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-weight="bold" font-size="80" fill="#ffffff">${initial}</text></svg>`;
-      const svgBlob = new Blob([svgString], { type: 'image/svg+xml' });
-      
-      const avatarRef = storageRef(storage, `avatars/${user.uid}/avatar.svg`);
-      await uploadBytes(avatarRef, svgBlob);
-      const avatarUrl = await getDownloadURL(avatarRef);
-
-      await updateProfile(user, { 
-        displayName: username, 
-        photoURL: avatarUrl 
-      });
-      
-      const userData = {
-        uid: user.uid,
-        username: username,
-        username_lowercase: username.toLowerCase(),
-        email: email,
-        avatar: avatarUrl,
-        age: ageNum,
-        bio: '',
-        isPrivate: false,
-        createdAt: serverTimestamp(),
-        lastSeen: serverTimestamp(),
-        isAnonymous: false,
-        appearOnRadar: true,
-        isVerified: false,
-        isBanned: false,
-        privacyAccepted: true,
-        privacyAcceptedAt: serverTimestamp()
-      };
-
-      await setDoc(doc(db, 'users', user.uid), userData);
-
-      // Salva no Banco de Dados Próprio (API Local)
-      await fetch('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userData)
-      }).catch(err => console.error("Erro ao salvar usuário na API local:", err));
+      const userData = result.user;
 
       // Salva na Memória do Celular (LocalStorage)
-      localStorage.setItem(`neos_user_${user.uid}`, JSON.stringify(userData));
-      localStorage.setItem('neos_current_user_id', user.uid);
+      localStorage.setItem(`neos_user_${userData.uid}`, JSON.stringify(userData));
+      localStorage.setItem('neos_current_user_id', userData.uid);
+      
+      // Tenta criar no Firebase em segundo plano (se possível) para manter compatibilidade
+      try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const fbUser = userCredential.user;
+        await updateProfile(fbUser, { displayName: username, photoURL: userData.avatar });
+        await setDoc(doc(db, 'users', fbUser.uid), { ...userData, uid: fbUser.uid });
+      } catch (fbErr) {
+        console.warn("Firebase falhou, mas conta local foi criada:", fbErr);
+      }
 
-      console.log("Néos: Conta criada!");
+      console.log("Néos: Conta criada no banco de dados próprio!");
+      window.location.reload(); // Recarrega para aplicar o login
       
     } catch (err: any) {
       console.error("SignUp Error:", err);
-      if (err.code === 'auth/email-already-in-use') {
-        setError("E-mail já cadastrado.");
-      } else if (err.code === 'auth/weak-password') {
-        setError("Senha muito fraca.");
-      } else {
-        setError("Falha ao criar conta. Tente novamente.");
-      }
+      setError("Falha ao criar conta. O servidor próprio está ativo, tente novamente.");
     } finally {
       setLoading(false);
     }
