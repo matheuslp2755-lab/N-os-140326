@@ -13,7 +13,9 @@ export const api = {
         if (contentType && contentType.indexOf("application/json") !== -1) {
           return await res.json();
         } else {
-          return { error: "Servidor retornou uma resposta inválida (não JSON)." };
+          const text = await res.text();
+          console.error("Resposta não JSON recebida (signup):", text.substring(0, 200));
+          return { error: "O servidor não respondeu corretamente. Tente novamente." };
         }
       } catch (e) {
         return { error: "Não foi possível conectar ao servidor." };
@@ -30,7 +32,9 @@ export const api = {
         if (contentType && contentType.indexOf("application/json") !== -1) {
           return await res.json();
         } else {
-          return { error: "Servidor retornou uma resposta inválida (não JSON)." };
+          const text = await res.text();
+          console.error("Resposta não JSON recebida (login):", text.substring(0, 200));
+          return { error: "O servidor não respondeu corretamente. Tente novamente." };
         }
       } catch (e) {
         return { error: "Não foi possível conectar ao servidor." };

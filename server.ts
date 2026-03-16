@@ -11,6 +11,12 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
 
+  // Logging middleware
+  app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+    next();
+  });
+
   // Banco de Dados Próprio (Local JSON)
   const DB_PATH = path.resolve("db.json");
   console.log("Caminho do banco de dados:", DB_PATH);
@@ -81,7 +87,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/auth/signup", (req, res) => {
+  app.post(["/api/auth/signup", "/api/auth/signup/"], (req, res) => {
     console.log("Recebendo pedido de signup:", req.body);
     try {
       const db = JSON.parse(fs.readFileSync(DB_PATH, "utf-8"));
@@ -120,7 +126,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/auth/login", (req, res) => {
+  app.post(["/api/auth/login", "/api/auth/login/"], (req, res) => {
     console.log("Recebendo pedido de login:", req.body.email);
     try {
       const db = JSON.parse(fs.readFileSync(DB_PATH, "utf-8"));
@@ -195,6 +201,12 @@ async function startServer() {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
+
+  // Error handler
+  app.use((err: any, req: any, res: any, next: any) => {
+    console.error("Erro Global:", err);
+    res.status(500).json({ error: "Erro interno no servidor" });
+  });
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Néos Server rodando em http://localhost:${PORT}`);
