@@ -28,11 +28,16 @@ async function startServer() {
   }
 
   // API Routes
+  app.get("/api/debug", (req, res) => {
+    res.json({ status: "ok", message: "API is reachable", env: process.env.NODE_ENV });
+  });
+
   app.get("/api/posts", (req, res) => {
     try {
       const db = JSON.parse(fs.readFileSync(DB_PATH, "utf-8"));
       res.json(db.posts || []);
     } catch (e) {
+      console.error("Erro ao ler posts:", e);
       res.status(500).json({ error: "Erro ao ler posts" });
     }
   });
@@ -87,12 +92,16 @@ async function startServer() {
     }
   });
 
-  app.post(["/api/auth/signup", "/api/auth/signup/"], (req, res) => {
-    console.log("Recebendo pedido de signup:", req.body);
+  app.post("/api/auth/signup", (req, res) => {
+    console.log("POST /api/auth/signup - Body:", req.body);
     try {
       const db = JSON.parse(fs.readFileSync(DB_PATH, "utf-8"));
       const { email, username, password, age } = req.body;
       
+      if (!email || !username || !password) {
+        return res.status(400).json({ error: "Dados incompletos para cadastro." });
+      }
+
       if (!db.users) db.users = [];
       
       if (db.users.find((u: any) => u.email === email)) {
@@ -126,8 +135,8 @@ async function startServer() {
     }
   });
 
-  app.post(["/api/auth/login", "/api/auth/login/"], (req, res) => {
-    console.log("Recebendo pedido de login:", req.body.email);
+  app.post("/api/auth/login", (req, res) => {
+    console.log("POST /api/auth/login - Email:", req.body.email);
     try {
       const db = JSON.parse(fs.readFileSync(DB_PATH, "utf-8"));
       const { email, password } = req.body;
@@ -174,17 +183,27 @@ async function startServer() {
   });
 
   app.post("/api/users/:id", (req, res) => {
-    const db = JSON.parse(fs.readFileSync(DB_PATH, "utf-8"));
-    const userData = req.body;
-    const index = db.users.findIndex((u: any) => u.uid === req.params.id || u.id === req.params.id);
-    if (index !== -1) {
-      db.users[index] = { ...db.users[index], ...userData };
-      fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
-      const { password, ...safeUser } = db.users[index];
-      res.json({ success: true, user: safeUser });
-    } else {
-      res.status(404).json({ error: "Usuário não encontrado" });
+    try {
+      const db = JSON.parse(fs.readFileSync(DB_PATH, "utf-8"));
+      const userData = req.body;
+      const index = db.users.findIndex((u: any) => u.uid === req.params.id || u.id === req.params.id);
+      if (index !== -1) {
+        db.users[index] = { ...db.users[index], ...userData };
+        fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
+        const { password, ...safeUser } = db.users[index];
+        res.json({ success: true, user: safeUser });
+      } else {
+        res.status(404).json({ error: "Usuário não encontrado" });
+      }
+    } catch (e) {
+      res.status(500).json({ error: "Erro ao atualizar usuário" });
     }
+  });
+
+  // Catch-all for API routes that don't exist
+  app.all("/api/*", (req, res) => {
+    console.warn(`404 API Route: ${req.method} ${req.url}`);
+    res.status(404).json({ error: `Rota API não encontrada: ${req.method} ${req.url}` });
   });
 
   // Vite middleware for development

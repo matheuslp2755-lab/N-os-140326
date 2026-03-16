@@ -4,7 +4,9 @@ export const api = {
   auth: {
     signup: async (data: any) => {
       try {
-        const res = await fetch('/api/auth/signup', {
+        const url = '/api/auth/signup';
+        console.log(`Chamando API: ${url}`);
+        const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data)
