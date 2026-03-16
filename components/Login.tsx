@@ -49,7 +49,20 @@ const Login: React.FC<LoginProps> = ({ onSwitchMode }) => {
     setLoading(true);
     setError('');
     try {
-      await signInWithEmailAndPassword(auth, sanitize(email), password);
+      const userCredential = await signInWithEmailAndPassword(auth, sanitize(email), password);
+      const user = userCredential.user;
+      
+      // Salva ID na Memória do Celular para persistência rápida
+      localStorage.setItem('neos_current_user_id', user.uid);
+      
+      // Tenta buscar dados do usuário para cache local
+      fetch(`/api/users/${user.uid}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data) localStorage.setItem(`neos_user_${user.uid}`, JSON.stringify(data));
+        })
+        .catch(() => {});
+
     } catch (err: any) {
       if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
         setError(t('login.error'));

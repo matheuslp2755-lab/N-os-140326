@@ -21,6 +21,16 @@ const AppContent: React.FC = () => {
   const [authPage, setAuthPage] = useState<'login' | 'signup'>('login');
 
   useEffect(() => {
+    // Tenta carregar usuário da memória do celular (LocalStorage) para um carregamento instantâneo
+    const cachedUserId = localStorage.getItem('neos_current_user_id');
+    if (cachedUserId) {
+      const cachedUser = localStorage.getItem(`neos_user_${cachedUserId}`);
+      if (cachedUser) {
+        // Opcional: Você pode definir um estado de 'usuário prévio' aqui se quiser
+        console.log("Néos: Usuário carregado da memória local:", cachedUserId);
+      }
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setLoading(false);

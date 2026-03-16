@@ -176,6 +176,18 @@ const UserProfile: React.FC<UserProfileProps> = ({ userId, onStartMessage, onSel
             if (updatedData.currentVibe !== undefined) payload.currentVibe = updatedData.currentVibe;
 
             await updateDoc(doc(db, 'users', userId), payload);
+
+            // Salva no Banco de Dados Próprio (API Local)
+            await fetch('/api/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uid: userId, ...payload })
+            }).catch(err => console.error("Erro ao salvar perfil na API local:", err));
+
+            // Salva na Memória do Celular (LocalStorage)
+            const localData = JSON.parse(localStorage.getItem(`neos_user_${userId}`) || '{}');
+            localStorage.setItem(`neos_user_${userId}`, JSON.stringify({ ...localData, ...payload }));
+
             setIsEditModalOpen(false);
         } catch (e) {
             console.error("Erro ao salvar perfil:", e);

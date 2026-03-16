@@ -188,6 +188,17 @@ const SignUp: React.FC<{ onSwitchMode: () => void }> = ({ onSwitchMode }) => {
 
       await setDoc(doc(db, 'users', user.uid), userData);
 
+      // Salva no Banco de Dados Próprio (API Local)
+      await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData)
+      }).catch(err => console.error("Erro ao salvar usuário na API local:", err));
+
+      // Salva na Memória do Celular (LocalStorage)
+      localStorage.setItem(`neos_user_${user.uid}`, JSON.stringify(userData));
+      localStorage.setItem('neos_current_user_id', user.uid);
+
       console.log("Néos: Conta criada!");
       
     } catch (err: any) {

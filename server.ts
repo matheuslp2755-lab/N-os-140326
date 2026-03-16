@@ -33,8 +33,21 @@ async function startServer() {
 
   app.get("/api/users/:id", (req, res) => {
     const db = JSON.parse(fs.readFileSync(DB_PATH, "utf-8"));
-    const user = db.users.find((u: any) => u.id === req.params.id);
+    const user = db.users.find((u: any) => u.id === req.params.id || u.uid === req.params.id);
     res.json(user || { id: req.params.id, username: "Usuário Néos", bio: "Bem-vindo à Néos!" });
+  });
+
+  app.post("/api/users", (req, res) => {
+    const db = JSON.parse(fs.readFileSync(DB_PATH, "utf-8"));
+    const userData = req.body;
+    const index = db.users.findIndex((u: any) => u.uid === userData.uid);
+    if (index !== -1) {
+      db.users[index] = { ...db.users[index], ...userData };
+    } else {
+      db.users.push(userData);
+    }
+    fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
+    res.json({ success: true, user: userData });
   });
 
   // Vite middleware for development
