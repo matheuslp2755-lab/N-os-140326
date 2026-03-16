@@ -22,14 +22,14 @@ export const where = (...args: any[]) => ({});
 export const orderBy = (...args: any[]) => ({});
 export const limit = (...args: any[]) => ({});
 
-export const getDocs = async (...args: any[]) => ({ empty: true, docs: [] });
-export const getDoc = async (...args: any[]) => ({ exists: () => false, data: () => ({}) });
+export const getDocs = async (...args: any[]) => ({ empty: true, docs: [], forEach: (cb: any) => {} });
+export const getDoc = async (...args: any[]) => ({ exists: () => false, data: () => ({}), id: 'mock' });
 export const setDoc = async (...args: any[]) => {};
 export const updateDoc = async (...args: any[]) => {};
 export const addDoc = async (...args: any[]) => ({ id: Date.now().toString() });
 export const deleteDoc = async (...args: any[]) => {};
 
-export const onSnapshot = (q: any, cb: any) => {
+export const onSnapshot = (q: any, cb: any, err?: any) => {
   // Mock snapshot
   return () => {};
 };
@@ -46,10 +46,10 @@ export const uploadString = async (ref: any, str: any, format: any) => {};
 export const getDownloadURL = async (ref: any) => "";
 export const deleteObject = async (ref: any) => {};
 
-export const writeBatch = () => ({
-  set: () => {},
-  update: () => {},
-  delete: () => {},
+export const writeBatch = (...args: any[]) => ({
+  set: (...args: any[]) => {},
+  update: (...args: any[]) => {},
+  delete: (...args: any[]) => {},
   commit: async () => {}
 });
 

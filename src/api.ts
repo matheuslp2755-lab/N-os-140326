@@ -3,20 +3,38 @@
 export const api = {
   auth: {
     signup: async (data: any) => {
-      const res = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
-      return res.json();
+      try {
+        const res = await fetch('/api/auth/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const contentType = res.headers.get("content-type");
+        if (contentType && contentType.indexOf("application/json") !== -1) {
+          return await res.json();
+        } else {
+          return { error: "Servidor retornou uma resposta inválida (não JSON)." };
+        }
+      } catch (e) {
+        return { error: "Não foi possível conectar ao servidor." };
+      }
     },
     login: async (data: any) => {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
-      return res.json();
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const contentType = res.headers.get("content-type");
+        if (contentType && contentType.indexOf("application/json") !== -1) {
+          return await res.json();
+        } else {
+          return { error: "Servidor retornou uma resposta inválida (não JSON)." };
+        }
+      } catch (e) {
+        return { error: "Não foi possível conectar ao servidor." };
+      }
     }
   },
   users: {

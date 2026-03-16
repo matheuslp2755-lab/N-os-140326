@@ -140,7 +140,7 @@ const SignUp: React.FC<{ onSwitchMode: () => void }> = ({ onSwitchMode }) => {
       const result = await api.auth.signup({ email, username, password, age: ageNum });
       
       if (result.error) {
-        setError(result.error || "Erro ao criar conta no servidor local.");
+        setError(result.error);
         setLoading(false);
         return;
       }
